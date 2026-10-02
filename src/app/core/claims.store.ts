@@ -14,7 +14,7 @@ export type ClaimsState = {
 
 export type AppState = { claims: ClaimsState }
 
-const persisted = localStorage.getItem('property-claims-draft-v1')
+const persisted = localStorage.getItem('property-claims-v2')
 
 export const initialClaimsState: ClaimsState = persisted
   ? JSON.parse(persisted)
@@ -44,7 +44,6 @@ export const claimsReducer = createReducer(
   on(updateClaim, (state, { claim }) => ({
     ...state,
     items: state.items.map((item) => (item.id === claim.id ? claim : item)),
-    toast: '案件版本已更新',
   })),
   on(setToast, (state, { message }) => ({ ...state, toast: message })),
 )
