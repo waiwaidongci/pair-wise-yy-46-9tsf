@@ -1,4 +1,29 @@
-import type { ClaimCase } from './models'
+import type { ApprovalBasis, ClaimCase } from './models'
+
+const basis0918: ApprovalBasis = {
+  reserve: 1358200,
+  deductible: 50000,
+  quoteTotal: 1578000,
+  weightedTotal: 1408200,
+  boundAt: '2026-09-19 10:30',
+  snapshots: [
+    { itemId: 'LI-01', category: '房屋建筑', quoteVersion: 2, quoteAmount: 742000, salvage: 18000, liability: 0.9, net: 651600 },
+    { itemId: 'LI-02', category: '机器设备', quoteVersion: 1, quoteAmount: 520000, salvage: 32000, liability: 1, net: 488000 },
+    { itemId: 'LI-03', category: '存货', quoteVersion: 1, quoteAmount: 316000, salvage: 0, liability: 0.85, net: 268600 },
+  ],
+}
+
+const basis0927: ApprovalBasis = {
+  reserve: 667200,
+  deductible: 20000,
+  quoteTotal: 860000,
+  weightedTotal: 687200,
+  boundAt: '2026-09-24 17:00',
+  snapshots: [
+    { itemId: 'LI-11', category: '房屋建筑', quoteVersion: 1, quoteAmount: 420000, salvage: 8000, liability: 1, net: 412000 },
+    { itemId: 'LI-12', category: '存货', quoteVersion: 1, quoteAmount: 440000, salvage: 96000, liability: 0.8, net: 275200 },
+  ],
+}
 
 export const seedClaims: ClaimCase[] = [
   {
@@ -11,7 +36,8 @@ export const seedClaims: ClaimCase[] = [
     adjuster: '陆嘉 / 华东财产险',
     status: '待复核',
     riskLevel: '高',
-    reserve: 1860000,
+    reserve: 1358200,
+    basisVersion: 1,
     paid: 0,
     deductible: 50000,
     lossItems: [
@@ -62,16 +88,15 @@ export const seedClaims: ClaimCase[] = [
       },
     ],
     approvals: [
-      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '陆嘉', comment: '现场查勘与资料收集完成。', completedAt: '2026-09-19 10:30' },
+      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '陆嘉', comment: '现场查勘与资料收集完成。', completedAt: '2026-09-19 10:30', basis: basis0918, basisVersion: 1 },
       { role: '高级核赔员', threshold: 500000, status: '待处理' },
       { role: '理赔经理', threshold: 1000000, status: '待处理' },
-      { role: '区域负责人', threshold: 1500000, status: '待处理' },
     ],
     audit: [
       { id: 'A-01', at: '09-08 21:32', operator: '报案中心', action: '案件受理', detail: '完成初步报案信息登记。' },
       { id: 'A-02', at: '09-12 10:20', operator: '陈立', action: '报价录入', detail: '房屋建筑报价 680,000 元。' },
       { id: 'A-03', at: '09-18 16:05', operator: '陈立', action: '报价调整', detail: '由 680,000 调整为 742,000 元；原因：补充檩条更换及防火涂层恢复。' },
-      { id: 'A-04', at: '09-19 10:30', operator: '陆嘉', action: '提交审批', detail: '准备金 1,860,000 元进入多级会签。' },
+      { id: 'A-04', at: '09-19 10:30', operator: '陆嘉', action: '提交审批', detail: '准备金 1,358,200 元进入多级会签；签署依据：报价合计 1,578,000 元，按责任比例加权 1,408,200 元，扣免赔 50,000 元。', basisVersion: 1, basis: basis0918 },
     ],
   },
   {
@@ -84,7 +109,8 @@ export const seedClaims: ClaimCase[] = [
     adjuster: '林澈 / 浙江财产险',
     status: '查勘中',
     riskLevel: '中',
-    reserve: 860000,
+    reserve: 667200,
+    basisVersion: 1,
     paid: 0,
     deductible: 20000,
     lossItems: [
@@ -114,13 +140,13 @@ export const seedClaims: ClaimCase[] = [
       },
     ],
     approvals: [
-      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '林澈', completedAt: '2026-09-24 17:00' },
+      { role: '查勘员提交', threshold: 0, status: '已通过', operator: '林澈', comment: '现场查勘与资料收集完成。', completedAt: '2026-09-24 17:00', basis: basis0927, basisVersion: 1 },
       { role: '高级核赔员', threshold: 500000, status: '待处理' },
-      { role: '理赔经理', threshold: 1000000, status: '待处理' },
     ],
     audit: [
       { id: 'A-11', at: '09-21 06:18', operator: '报案中心', action: '案件受理', detail: '台风损失报案。' },
       { id: 'A-12', at: '09-22 09:15', operator: '林澈', action: '现场查勘', detail: '上传屋顶和库区照片。' },
+      { id: 'A-13', at: '09-24 17:00', operator: '林澈', action: '提交审批', detail: '准备金 667,200 元进入多级会签；签署依据：报价合计 860,000 元，按责任比例加权 687,200 元，扣免赔 20,000 元。', basisVersion: 1, basis: basis0927 },
     ],
   },
 ]

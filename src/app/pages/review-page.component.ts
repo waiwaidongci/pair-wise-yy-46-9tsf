@@ -33,19 +33,35 @@ import { StatusChipComponent } from '../shared/status-chip.component'
       <div class="review-grid">
         <section class="panel">
           <div class="panel-head"><h3>会签流程</h3><app-status-chip [label]="claim.status" [tone]="claim.status === '退回补件' ? 'warn' : 'good'" /></div>
+          <div class="basis-note">
+            <mat-icon>sync</mat-icon>
+            <span>每次签署绑定当时准备金与报价版本（当前 v{{ claim.basisVersion }}）；报价或责任比例改动后按新值重算，受影响的未完成步骤失效，已签步骤保留原依据。</span>
+          </div>
           <mat-stepper orientation="vertical" [linear]="false" class="approval-stepper">
-            <mat-step *ngFor="let step of claim.approvals; let index = index" [completed]="step.status === '已通过'">
+            <mat-step *ngFor="let step of claim.approvals; let index = index" [completed]="step.status === '已通过'" [state]="step.status === '已失效' ? 'error' : step.status === '已通过' ? 'done' : 'number'">
               <ng-template matStepLabel>
                 <strong>{{ step.role }}</strong>
                 <span class="threshold">触发阈值 {{ step.threshold | currency:'CNY':'symbol':'1.0-0' }}</span>
               </ng-template>
-              <div class="step-body">
-                <p>{{ step.comment || (step.status === '待处理' ? '等待当前审核人处理。' : step.status + '。') }}</p>
+              <div class="step-body" [class.invalid]="step.status === '已失效'">
+                <p *ngIf="step.status !== '已失效'">{{ step.comment || (step.status === '待处理' ? '等待当前审核人处理。' : step.status + '。') }}</p>
+                <div class="invalid-box" *ngIf="step.status === '已失效'">
+                  <mat-icon>block</mat-icon>
+                  <div><strong>步骤已失效</strong><span>{{ step.invalidReason }}</span></div>
+                </div>
+                <div class="basis-box" *ngIf="step.basis">
+                  <strong>签署依据 v{{ step.basisVersion }}</strong>
+                  <span>准备金 {{ step.basis.reserve | currency:'CNY':'symbol':'1.0-0' }} = 报价合计 {{ step.basis.quoteTotal | currency:'CNY':'symbol':'1.0-0' }} × 责任比例加权 {{ step.basis.weightedTotal | currency:'CNY':'symbol':'1.0-0' }}，扣免赔 {{ step.basis.deductible | currency:'CNY':'symbol':'1.0-0' }}</span>
+                  <span class="versions">报价版本 {{ quoteVersions(step.basis) }} · 签署于 {{ step.basis.boundAt }}</span>
+                </div>
                 <small *ngIf="step.operator">{{ step.operator }} · {{ step.completedAt }}</small>
+                <div class="stale-note" *ngIf="step.status === '待处理' && step.basisStale">
+                  <mat-icon>update</mat-icon><span>依据已更新：请按新准备金 {{ claim.reserve | currency:'CNY':'symbol':'1.0-0' }} 重新核对后再签署。</span>
+                </div>
                 <div class="step-actions" *ngIf="step.status === '待处理'">
                   <mat-form-field appearance="outline" subscriptSizing="dynamic"><mat-label>审批意见</mat-label><input matInput [(ngModel)]="comments[index]" /></mat-form-field>
-                  <button mat-flat-button color="primary" [disabled]="!comments[index]?.trim()" (click)="decide(claim.id, step.role, '已通过', index)">通过</button>
-                  <button mat-stroked-button color="warn" [disabled]="!comments[index]?.trim()" (click)="decide(claim.id, step.role, '退回补件', index)">退回补件</button>
+                  <button mat-flat-button color="primary" [disabled]="!comments[index]?.trim()" (click)="decide(claim.id, step.role, '已通过', index, claim.basisVersion)">通过</button>
+                  <button mat-stroked-button color="warn" [disabled]="!comments[index]?.trim()" (click)="decide(claim.id, step.role, '退回补件', index, claim.basisVersion)">退回补件</button>
                 </div>
               </div>
             </mat-step>
@@ -87,12 +103,25 @@ import { StatusChipComponent } from '../shared/status-chip.component'
   styles: [`
     .reserve { padding: 10px 14px; border-left: 3px solid #2f8191; background: #eaf4f5; color: #175866; font-weight: 800; }
     .review-grid { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 14px; align-items: start; }
+    .basis-note { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 12px; padding: 9px 12px; color: #175866; background: #eaf4f5; border-left: 3px solid #2f8191; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+    .basis-note mat-icon { font-size: 16px; width: 16px; height: 16px; margin-top: 1px; }
     .approval-stepper { padding: 18px 22px 22px 8px; background: transparent; }
     mat-step strong, mat-step .threshold { display: block; }
     .threshold { margin-top: 3px; color: #78858d; font-size: 10px; }
     .step-body { padding: 4px 0 16px; }
+    .step-body.invalid { opacity: 1; }
     .step-body p { margin: 0 0 6px; color: #58666f; }
     .step-body small { color: #869198; }
+    .invalid-box { display: flex; gap: 9px; padding: 10px 12px; background: #fdecec; border-left: 3px solid #c25555; border-radius: 6px; }
+    .invalid-box mat-icon { color: #b3402f; font-size: 18px; width: 18px; height: 18px; }
+    .invalid-box strong { display: block; color: #a03a2b; font-size: 12px; }
+    .invalid-box span { display: block; margin-top: 3px; color: #7a4a42; font-size: 11px; line-height: 1.5; }
+    .basis-box { margin: 8px 0; padding: 9px 12px; background: #f0f7f7; border-left: 3px solid #2f8191; border-radius: 6px; }
+    .basis-box strong { display: block; color: #175866; font-size: 12px; }
+    .basis-box span { display: block; margin-top: 3px; color: #556972; font-size: 11px; line-height: 1.5; }
+    .basis-box .versions { color: #7a858c; font-size: 10px; }
+    .stale-note { display: flex; gap: 6px; align-items: center; margin: 8px 0; padding: 7px 10px; color: #8a5a1e; background: #fff4e2; border-radius: 5px; font-size: 11px; }
+    .stale-note mat-icon { font-size: 15px; width: 15px; height: 15px; }
     .step-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
     .step-actions mat-form-field { flex: 1; min-width: 240px; }
     aside { display: grid; gap: 14px; }
@@ -133,13 +162,20 @@ export class ReviewPageComponent {
     return claim.lossItems.filter((item: any) => item.disputed).length
   }
 
-  decide(claimId: string, role: string, result: string, index: number) {
+  quoteVersions(basis: { snapshots: Array<{ quoteVersion: number }> }) {
+    return basis.snapshots.map((snap) => `V${snap.quoteVersion}`).join('/')
+  }
+
+  decide(claimId: string, role: string, result: string, index: number, basisVersion: number) {
     const comment = this.comments[index]?.trim()
     if (!comment) return
-    this.service.approve(claimId, { role, result, comment }).subscribe(() => {
-      this.store.select(selectSelectedClaim).subscribe((claim) => this.store.dispatch(updateClaim({ claim: structuredClone(claim) })))
-      this.snackBar.open(result === '已通过' ? '会签通过，已流转至下一级' : '案件已退回补件，原始记录未修改', '关闭', { duration: 2200 })
-      this.comments[index] = ''
+    this.service.approve(claimId, { role, result, comment, observedBasisVersion: basisVersion }).subscribe({
+      next: (updated) => {
+        this.store.dispatch(updateClaim({ claim: updated }))
+        this.snackBar.open(result === '已通过' ? '会签通过，已绑定当前金额依据' : '案件已退回补件，原始记录未修改', '关闭', { duration: 2200 })
+        this.comments[index] = ''
+      },
+      error: (err) => this.snackBar.open(err?.error?.statusText || '会签写入被拒绝', '关闭', { duration: 3000 }),
     })
   }
 }

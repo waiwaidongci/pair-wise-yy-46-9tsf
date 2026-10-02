@@ -38,6 +38,13 @@ import { StatusChipComponent } from '../shared/status-chip.component'
               <div class="event">
                 <strong>{{ event.action }}</strong>
                 <p>{{ event.detail }}</p>
+                <div class="basis" *ngIf="event.basis">
+                  <mat-icon>receipt_long</mat-icon>
+                  <div>
+                    <strong>签署金额依据 v{{ event.basisVersion ?? '—' }}</strong>
+                    <span>准备金 {{ event.basis.reserve | currency:'CNY':'symbol':'1.0-0' }} = 报价合计 {{ event.basis.quoteTotal | currency:'CNY':'symbol':'1.0-0' }}（{{ quoteVersions(event.basis) }}）× 责任比例加权 {{ event.basis.weightedTotal | currency:'CNY':'symbol':'1.0-0' }}，扣免赔 {{ event.basis.deductible | currency:'CNY':'symbol':'1.0-0' }}</span>
+                  </div>
+                </div>
                 <small>{{ event.operator }} · 记录编号 {{ event.id }}</small>
               </div>
             </article>
@@ -80,6 +87,10 @@ import { StatusChipComponent } from '../shared/status-chip.component'
     .event { padding: 0 0 22px 8px; }
     .event strong { font-size: 13px; }
     .event p { margin: 6px 0; color: #56656e; font-size: 12px; line-height: 1.55; }
+    .event .basis { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; padding: 8px 10px; background: #f0f7f7; border-left: 3px solid #2f8191; border-radius: 5px; }
+    .event .basis mat-icon { font-size: 16px; width: 16px; height: 16px; color: #2f8191; }
+    .event .basis strong { display: block; color: #175866; font-size: 11px; }
+    .event .basis span { display: block; margin-top: 2px; color: #556972; font-size: 11px; line-height: 1.5; }
     .event small { color: #89949b; font-size: 10px; }
     aside { display: grid; gap: 14px; }
     .file-list { padding: 8px 14px 16px; }
@@ -114,8 +125,23 @@ export class AuditPageComponent {
     this.store.dispatch(saveDraft({ draft: `草稿更新于 ${new Date().toLocaleString('zh-CN')}` }))
   }
 
+  quoteVersions(basis: { snapshots: Array<{ quoteVersion: number }> }) {
+    return basis.snapshots.map((snap) => `V${snap.quoteVersion}`).join('/')
+  }
+
+  basisSummary(event: { basis?: { reserve: number; quoteTotal: number; weightedTotal: number; deductible: number; snapshots: Array<{ quoteVersion: number }> } }) {
+    if (!event.basis) return ''
+    const versions = event.basis.snapshots.map((snap) => `V${snap.quoteVersion}`).join('/')
+    return `准备金 ${event.basis.reserve}；报价合计 ${event.basis.quoteTotal}（${versions}）；加权 ${event.basis.weightedTotal}；免赔 ${event.basis.deductible}`
+  }
+
   exportAudit(claim: any) {
-    const lines = ['时间,操作者,动作,说明', ...claim.audit.map((event: any) => [event.at, event.operator, event.action, event.detail].map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))]
+    const lines = [
+      '时间,操作者,动作,说明,金额依据',
+      ...claim.audit.map((event: any) =>
+        [event.at, event.operator, event.action, event.detail, this.basisSummary(event)].map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','),
+      ),
+    ]
     const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
     const link = document.createElement('a')
     link.href = url

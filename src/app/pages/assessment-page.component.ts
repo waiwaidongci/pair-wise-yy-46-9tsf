@@ -52,7 +52,12 @@ import { StatusChipComponent } from '../shared/status-chip.component'
         <mat-card appearance="outlined"><span>损失科目</span><strong>{{ claim.lossItems.length }}</strong><small>{{ disputedCount(claim) }} 项存在争议</small></mat-card>
         <mat-card appearance="outlined"><span>修复报价合计</span><strong>{{ quoteTotal(claim) | currency:'CNY':'symbol':'1.0-0' }}</strong><small>取各科目最新报价</small></mat-card>
         <mat-card appearance="outlined"><span>残值合计</span><strong>{{ salvageTotal(claim) | currency:'CNY':'symbol':'1.0-0' }}</strong><small>待扣减</small></mat-card>
-        <mat-card appearance="outlined"><span>建议准备金</span><strong>{{ suggestedReserve(claim) | currency:'CNY':'symbol':'1.0-0' }}</strong><small>责任比例后计入免赔</small></mat-card>
+        <mat-card appearance="outlined"><span>申请准备金</span><strong>{{ claim.reserve | currency:'CNY':'symbol':'1.0-0' }}</strong><small>依据版本 v{{ claim.basisVersion }} · 改动后重算</small></mat-card>
+      </div>
+
+      <div class="basis-banner">
+        <mat-icon>sync</mat-icon>
+        <div><strong>版本化依据</strong><span>报价或责任比例调整后，准备金按新值重算：受影响的未完成会签步骤失效，已签步骤保留原依据并记录失效原因。当前依据版本 v{{ claim.basisVersion }}。</span></div>
       </div>
 
       <div class="assessment-grid">
@@ -129,6 +134,10 @@ import { StatusChipComponent } from '../shared/status-chip.component'
     .summary-grid mat-card { padding: 15px; border-color: #dce3e6; }
     .summary-grid span, .summary-grid small { display: block; color: #6e7a83; font-size: 12px; }
     .summary-grid strong { display: block; margin: 6px 0; color: #153747; font-size: 24px; }
+    .basis-banner { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; padding: 10px 14px; color: #175866; background: #eaf4f5; border-left: 3px solid #2f8191; border-radius: 6px; }
+    .basis-banner mat-icon { font-size: 18px; width: 18px; height: 18px; margin-top: 2px; }
+    .basis-banner strong { display: block; font-size: 13px; }
+    .basis-banner span { display: block; margin-top: 2px; font-size: 11px;; color: #4d6b73; line-height: 1.5; }
     .assessment-grid { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 14px; align-items: start; }
     mat-panel-title { display: flex; flex-direction: column; gap: 4px; }
     mat-panel-title span { color: #7a858c; font-size: 11px; }
@@ -189,11 +198,6 @@ export class AssessmentPageComponent {
     return claim.lossItems.reduce((sum, item) => sum + item.salvage, 0)
   }
 
-  suggestedReserve(claim: any) {
-    const net = claim.lossItems.reduce((sum: number, item: any) => sum + (this.latestQuote(item) - item.salvage) * item.liability, 0)
-    return Math.max(0, net - claim.deductible)
-  }
-
   disputedCount(claim: { lossItems: Array<{ disputed: boolean }> }) {
     return claim.lossItems.filter((item) => item.disputed).length
   }
@@ -206,21 +210,29 @@ export class AssessmentPageComponent {
 
   submitQuote(claimId: string, itemId: string) {
     if (!this.quoteReason.trim()) return
-    this.service.addQuote(claimId, { itemId, amount: Number(this.quoteAmount), reason: this.quoteReason }).subscribe(() => {
-      this.store.select(selectSelectedClaim).subscribe((claim) => this.store.dispatch(updateClaim({ claim: structuredClone(claim) })))
-      this.snackBar.open('新报价版本已生成，原记录保持可追溯', '关闭', { duration: 2200 })
-      this.quotingItemId = ''
+    this.service.addQuote(claimId, { itemId, amount: Number(this.quoteAmount), reason: this.quoteReason }).subscribe({
+      next: (updated) => {
+        this.store.dispatch(updateClaim({ claim: updated }))
+        this.snackBar.open('新报价版本已生成，准备金已按新值重算，受影响步骤已失效', '关闭', { duration: 2600 })
+        this.quotingItemId = ''
+      },
+      error: (err) => this.snackBar.open(err?.error?.statusText || '报价保存失败', '关闭', { duration: 2200 }),
     })
   }
 
-  saveAll(claim: any) {
+  saveAll(claim: ClaimCase) {
     localStorage.setItem('claims-assessment-draft', this.draft)
-    this.store.dispatch(updateClaim({ claim: structuredClone(claim) }))
-    this.snackBar.open('查勘数据和草稿已保存', '关闭', { duration: 1800 })
+    const items = claim.lossItems.map((item) => ({ itemId: item.id, liability: item.liability, salvage: item.salvage, damage: item.damage }))
+    this.service.saveAssessment(claim.id, { items }).subscribe({
+      next: (updated) => {
+        this.store.dispatch(updateClaim({ claim: updated }))
+        this.snackBar.open('查勘数据已保存，准备金与待处理步骤已按新值重算', '关闭', { duration: 2600 })
+      },
+      error: (err) => this.snackBar.open(err?.error?.statusText || '保存失败', '关闭', { duration: 2200 }),
+    })
   }
 
-  saveDraft(claim: any) {
+  saveDraft(claim: ClaimCase) {
     localStorage.setItem('claims-assessment-draft', this.draft)
-    this.store.dispatch(updateClaim({ claim: structuredClone(claim) }))
   }
 }

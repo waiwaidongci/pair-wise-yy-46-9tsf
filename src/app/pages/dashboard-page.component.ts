@@ -134,7 +134,7 @@ import { selectAllClaims, selectFilters, selectFilteredClaims, selectClaim, setF
           </div>
           <div class="risk-note">
             <mat-icon>warning_amber</mat-icon>
-            <div><strong>当前案件触发四级会签</strong><p>涉及房屋建筑与设备报价调整，需补充第三方依据后方可通过。</p></div>
+            <div><strong>当前触发 {{ highestLevel$ | async }} 级会签</strong><p>报价或责任比例调整后按新值重算准备金，受影响的未完成步骤失效，已签步骤保留原依据。</p></div>
           </div>
         </aside>
       </div>
@@ -169,6 +169,7 @@ export class DashboardPageComponent {
   totalReserve$: Observable<number>
   pendingApprovals$: Observable<number>
   disputedItems$: Observable<number>
+  highestLevel$: Observable<number>
   columns = ['case', 'insured', 'reserve', 'risk', 'status', 'action']
 
   constructor(
@@ -181,6 +182,9 @@ export class DashboardPageComponent {
     this.totalReserve$ = this.store.select((state) => state.claims.items.reduce((sum, claim) => sum + claim.reserve, 0))
     this.pendingApprovals$ = this.store.select((state) => state.claims.items.reduce((sum, claim) => sum + claim.approvals.filter((step) => step.status === '待处理').length, 0))
     this.disputedItems$ = this.store.select((state) => state.claims.items.reduce((sum, claim) => sum + claim.lossItems.filter((item) => item.disputed).length, 0))
+    this.highestLevel$ = this.store.select((state) =>
+      state.claims.items.reduce((max, claim) => Math.max(max, ...claim.approvals.filter((step) => step.status !== '已失效').map((step) => step.threshold)), 0),
+    )
   }
 
   updateFilter(key: string, value: string) {
